@@ -1,27 +1,46 @@
 const express = require('express');
-const fs = require('fs');
+const http = require('http');
+const WebSocket = require('ws');
 const cors = require('cors');
+
 const app = express();
-const PORT = process.env.PORT || 3000;
-const filePath = 'visitas.json';
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+let onlineUsers = 0;
 
 app.use(cors());
 
-app.get('/visitas', (req, res) => {
-  let contador = 0;
-
-  if (fs.existsSync(filePath)) {
-    const data = fs.readFileSync(filePath, 'utf8');
-    contador = JSON.parse(data).visitas || 0;
-  }
-
-  contador++;
-
-  fs.writeFileSync(filePath, JSON.stringify({ visitas: contador }));
-
-  res.json({ visitas: contador });
+// API para retornar número atual de usuários online
+app.get('/online', (req, res) => {
+  res.json({ online: onlineUsers });
 });
 
-app.listen(PORT, () => {
+wss.on('connection', (ws) => {
+  onlineUsers++;
+  console.log('Nova conexão. Online agora:', onlineUsers);
+
+  // Atualiza todos os clientes conectados com o novo número
+  broadcastOnlineCount();
+
+  ws.on('close', () => {
+    onlineUsers--;
+    console.log('Desconectado. Online agora:', onlineUsers);
+    broadcastOnlineCount();
+  });
+});
+
+// Envia o número atual de usuários online para todos os conectados
+function broadcastOnlineCount() {
+  const data = JSON.stringify({ type: 'online', online: onlineUsers });
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(data);
+    }
+  });
+}
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
