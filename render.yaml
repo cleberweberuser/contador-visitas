@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: contador-visitas
+    env: node
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    branch: master
